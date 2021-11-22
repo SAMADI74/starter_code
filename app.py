@@ -13,6 +13,7 @@ from logging import Formatter, FileHandler
 from flask_wtf import Form
 from forms import *
 from flask_migrate import Migrate
+import datetime
 #----------------------------------------------------------------------------#
 # App Config.
 #----------------------------------------------------------------------------#
@@ -45,8 +46,8 @@ class Venue(db.Model):
     website = db.Column(db.String(120))
     seeking_talent = db.Column(db.Boolean,default=False)
     seeking_description = db.Column(db.Text)
-    upcoming_shows_count = db.Column(db.Integer, default=0)
-    past_shows_count = db.Column(db.Integer, default=0)
+    # upcoming_shows_count = db.Column(db.Integer, default=0)
+    # past_shows_count = db.Column(db.Integer, default=0)
     shows = db.relationship('Show',backref='venue',lazy=True, cascade="save-update, merge, delete")
 
     
@@ -66,8 +67,8 @@ class Artist(db.Model):
     website = db.Column(db.String(120))
     seeking_venue = db.Column(db.Boolean,default=False)
     seeking_description = db.Column(db.Text)
-    upcoming_shows_count = db.Column(db.Integer, default=0)
-    past_shows_count = db.Column(db.Integer, default=0)
+    # upcoming_shows_count = db.Column(db.Integer, default=0)
+    # past_shows_count = db.Column(db.Integer, default=0)
     shows = db.relationship('Show',backref='artist',lazy=True, cascade="save-update, merge, delete")
 
 
@@ -86,7 +87,7 @@ class Show(db.Model):
     start_time = db.Column(db.DateTime, nullable=False)
     artist_id = db.Column(db.Integer,db.ForeignKey('Artist.id') ,nullable=False)
     venue_id = db.Column(db.Integer,db.ForeignKey('Venue.id') ,nullable=False)
-    upcoming = db.Column(db.Boolean, nullable=False, default=True)
+    # upcoming = db.Column(db.Boolean, nullable=False, default=True)
 
 #----------------------------------------------------------------------------#
 # Filters.
@@ -120,20 +121,35 @@ def venues():
   #       num_shows should be aggregated based on number of upcoming shows per venue.
   venue_areas = db.session.query(Venue.city,Venue.state).group_by(Venue.state, Venue.city).all()
   data = []
-  for area in venue_areas:
-    venues = db.session.query(Venue.id,Venue.name,
-      Venue.upcoming_shows_count).filter(Venue.city==area[0],Venue.state==area[1]).all()
-    data.append({
-        "city": area[0],
-        "state": area[1],
-        "venues": []
-    })
-    for venue in venues:
-      data[-1]["venues"].append({
-              "id": venue[0],
-              "name": venue[1],
-              "num_upcoming_shows":venue[2]
-      })
+  today = datetime.datetime.now()
+
+  for location in venue_areas:
+            city = location[0]
+            state = location[1]
+
+            location_data = {"city": city, "state": state, "venues": []}
+
+            venues = Venue.query.filter_by(city=city, state=state).all()
+
+            for venue in venues:
+                venue_name = venue.name
+                venue_id = venue.id
+
+                upcoming_shows = (
+                    Show.query.filter_by(venue_id=venue_id)
+                    .filter(Show.start_time > today)
+                    .all()
+                )
+
+                venue_data = {
+                    "id": venue_id,
+                    "name": venue_name,
+                    "num_upcoming_shows": len(upcoming_shows),
+                }
+
+                location_data["venues"].append(venue_data)
+
+            data.append(location_data)
 
   return render_template('pages/venues.html', areas=data);
 
@@ -171,10 +187,8 @@ def show_venue(venue_id):
       "artist_image_link": show.artist.image_link,
       "start_time": str(show.start_time)
     }
-    if(show.upcoming):
-      upcoming_shows.append(show_info)
-    else:
-      past_shows.append(show_info)
+    upcoming_shows.append(show_info)
+    past_shows.append(show_info)
 
   data={
     "id": venue.id,
@@ -294,10 +308,8 @@ def show_artist(artist_id):
       "venue_image_link": show.venue.image_link,
       "start_time": str(show.start_time)
     }
-    if(show.upcoming):
-      upcoming_shows.append(show_info)
-    else:
-      past_shows.append(show_info)
+    upcoming_shows.append(show_info)
+    past_shows.append(show_info)
   data = {
     "id": artist.id,
     "name": artist.name,
@@ -371,7 +383,7 @@ def edit_venue(venue_id):
   form = VenueForm()
   venue = Venue.query.get(venue_id)
   venue_info={
-    "id": venue.id,
+    # "id": venue.id,
     "name": venue.name,
     "genres": venue.genres.split(','),
     "address": venue.address,
@@ -456,8 +468,7 @@ def shows():
   shows_list = Show.query.all()
   data = []
   for show in shows_list:
-    if(show.upcoming):
-      data.append({
+    data.append({
       "venue_id": show.venue_id,
       "venue_name": show.venue.name,
       "artist_id": show.artist_id,
@@ -467,6 +478,26 @@ def shows():
       })
 
   return render_template('pages/shows.html', shows=data)
+
+  # all_shows_data = []
+
+  #   try:
+  #       shows = Show.query.all()
+  #       for show in shows:
+  #           venue_id = show.venue_id
+  #           artist_id = show.artist_id
+  #           artist = Artist.query.get(artist_id)
+
+  #           each_show_data = {
+  #               "venue_id": venue_id,
+  #               "venue_name": Venue.query.get(venue_id).name,
+  #               "artist_id": artist_id,
+  #               "artist_name": artist.name,
+  #               "artist_image_link": artist.image_link,
+  #               "start_time": str(show.start_time),
+  #           }
+
+  #           all_shows_data.append(each_show_data)
 
 @app.route('/shows/create')
 def create_shows():
