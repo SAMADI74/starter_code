@@ -159,16 +159,11 @@ def search_venues():
   # seach for Hop should return "The Musical Hop".
   # search for "Music" should return "The Musical Hop" and "Park Square Live Music & Coffee"
   results = Venue.query.filter(Venue.name.ilike('%{}%'.format(request.form['search_term']))).all()
-  response={
-    "count": len(results),
-    "data": []
-    }
-  for venue in results:
-    response["data"].append({
-        "id": venue.id,
-        "name": venue.name,
-        "num_upcoming_shows": venue.upcoming_shows_count
-      })
+  response = {
+      'count': len(results),
+      'data': results
+  }
+
   
   return render_template('pages/search_venues.html', results=response, search_term=request.form.get('search_term', ''))
 
@@ -289,7 +284,7 @@ def search_artists():
     response['data'].append({
       "id": artist.id,
       "name": artist.name,
-      "num_upcoming_shows": artist.upcoming_shows_count,
+      # "num_upcoming_shows": artist.upcoming_shows_count,
       })
   return render_template('pages/search_artists.html', results=response, search_term=request.form.get('search_term', ''))
 
@@ -422,6 +417,7 @@ def edit_venue_submission(venue_id):
   finally:
     db.session.close()
   return redirect(url_for('show_venue', venue_id=venue_id))
+
 #  Create Artist
 #  ----------------------------------------------------------------
 
@@ -509,39 +505,65 @@ def create_shows():
 def create_show_submission():
   # called to create new shows in the db, upon submitting new show listing form
   # TODO: insert form data as a new Show record in the db, instead
-  new_show = Show()
-  new_show.artist_id = request.form['artist_id']
-  new_show.venue_id = request.form['venue_id']
-  dateAndTime = request.form['start_time'].split(' ')
-  DTList = dateAndTime[0].split('-')
-  DTList += dateAndTime[1].split(':') 
-  for i in range(len(DTList)):
-    DTList[i] = int(DTList[i])
-  new_show.start_time = datetime(DTList[0],DTList[1],DTList[2], DTList[3],DTList[4],DTList[5])
-  now = datetime.now()
-  new_show.upcoming = (now < new_show.start_time)
-  try:
-    db.session.add(new_show)
-    # update venue and artist table
-    updated_artist = Artist.query.get(new_show.artist_id)
-    updated_venue = Venue.query.get(new_show.venue_id)
-    if(new_show.upcoming):
-      updated_artist.upcoming_shows_count += 1
-      updated_venue.upcoming_shows_count += 1
-    else:
-      updated_artist.past_shows_count += 1
-      updated_venue.past_shows_count += 1
-    # on successful db insert, flash success
-    db.session.commit()
-    flash('Show was successfully listed!')
-  except:
-    db.session.rollback()
-    # TODO: on unsuccessful db insert, flash an error instead.
-    flash('Show could not be listed. please make sure that your ids are correct')
-  finally:
-    db.session.close()
-  # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
-  return redirect(url_for('index'))
+  # new_show = Show()
+  # new_show.artist_id = request.form['artist_id']
+  # new_show.venue_id = request.form['venue_id']
+  # dateAndTime = request.form['start_time'].split(' ')
+  # DTList = dateAndTime[0].split('-')
+  # DTList += dateAndTime[1].split(':') 
+  # for i in range(len(DTList)):
+  #   DTList[i] = int(DTList[i])
+  # new_show.start_time = datetime(DTList[0],DTList[1],DTList[2], DTList[3],DTList[4],DTList[5])
+  # now = datetime.now()
+  # new_show.upcoming = (now < new_show.start_time)
+  # try:
+  #   db.session.add(new_show)
+  #   # update venue and artist table
+  #   updated_artist = Artist.query.get(new_show.artist_id)
+  #   updated_venue = Venue.query.get(new_show.venue_id)
+  #   if(new_show.upcoming):
+  #     updated_artist.upcoming_shows_count += 1
+  #     updated_venue.upcoming_shows_count += 1
+  #   else:
+  #     updated_artist.past_shows_count += 1
+  #     updated_venue.past_shows_count += 1
+  #   # on successful db insert, flash success
+  #   db.session.commit()
+  #   flash('Show was successfully listed!')
+  # except:
+  #   db.session.rollback()
+  #   # TODO: on unsuccessful db insert, flash an error instead.
+  #   flash('Show could not be listed. please make sure that your ids are correct')
+  # finally:
+  #   db.session.close()
+  # # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
+  # return redirect(url_for('index'))
+
+  # called to create new shows in the db, upon submitting new show listing form
+    try:
+        data = ShowForm(request.form).data
+        new_show = Show(
+            artist_id=data.get('artist_id'),
+            venue_id=data.get('venue_id'),
+            start_time=data.get('start_time')
+        )
+
+        db.session.add(new_show)
+        db.session.commit()
+
+        # on successful db insert, flash success
+        flash('Show created successfully !')
+
+    except:
+        db.session.rollback()
+        print(sys.exc_info())
+        flash('An error occurred. Show could not be listed.')
+    finally:
+        db.session.close()
+
+    return render_template('pages/home.html')
+
+
 
 @app.errorhandler(404)
 def not_found_error(error):
